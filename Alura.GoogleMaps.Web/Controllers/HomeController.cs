@@ -10,7 +10,9 @@ using System.Net.Http;
 using System.Net;
 using Newtonsoft.Json;
 using Alura.GoogleMaps.Web.Geocoding;
-
+using MongoDB.Driver.GeoJsonObjectModel;
+using MongoDB.Driver;
+using MongoDB.Bson;
 
 namespace Alura.GoogleMaps.Web.Controllers
 {
@@ -52,16 +54,38 @@ namespace Alura.GoogleMaps.Web.Controllers
             //Captura o valor da distancia
             int distancia = model.Distancia * 1000;
 
-            //Conecta MongoDB    
-           
+            //Conecta MongoDB
+            var conexaoAeroporto = new conectandoMongoDBGeo();
+
             //Configura o ponto atual no mapa           
-          
+            var ponto = new GeoJson2DGeographicCoordinates(lon, lat);
+            var localizacao = new GeoJsonPoint<GeoJson2DGeographicCoordinates>(ponto);
+
             // filtro
-          
+            var construtor = Builders<Aeroporto>.Filter;
+            FilterDefinition<Aeroporto> filtro_builder;
+            if (tipoAero == "")
+            {
+                filtro_builder = construtor.NearSphere(x => x.Loc, localizacao, distancia);
+            }
+            else
+            {
+                filtro_builder = construtor.NearSphere(x => x.Loc, localizacao, distancia) & construtor.Eq(x=>x.Type, tipoAero);
+            }
+
             //Captura  a lista
-           
+            var listaAeroportos = conexaoAeroporto.Airports.Find(filtro_builder).ToList();
+
             //Escreve os pontos
-                    
+            foreach (var aeroporto in listaAeroportos)
+            {
+                var aero = new Coordenada(aeroporto.Name,
+                            Convert.ToString(aeroporto.Loc.Coordinates.Latitude).Replace(",", "."),
+                            Convert.ToString(aeroporto.Loc.Coordinates.Longitude).Replace(",", "."));
+                
+                aeroportosProximos.Add(aero);
+            }
+
             return Json(aeroportosProximos);
         }
 
